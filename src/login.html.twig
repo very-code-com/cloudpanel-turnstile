@@ -1,0 +1,109 @@
+{#
+  Copyright 2026 Emilian Scibisz
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+#}
+{% extends 'Frontend/Login/layout.html.twig' %}
+{% block pageTitle %}{% trans %}Log In{% endtrans %}{% endblock %}
+{% block body %}
+<div class="login-container">
+  <div class="logo">
+    <a title="CloudPanel" href="{{ path('clp_login') }}">
+      <img alt="CloudPanel" src="{{ asset('assets/images/cloudpanel-cloud.svg') }}" height="75">
+    </a>
+  </div>
+  <div class="login-form-container">
+    {{ include('Partial/flash-messages.html.twig', { 'flashBagMessages': app.session.flashbag.all }) }}
+    {% if authenticationError %}
+      <div class="alert-container">
+        <div class="alert alert-danger">
+          {{ authenticationError.messageKey|trans(authenticationError.messageData, 'security') }}
+        </div>
+      </div>
+    {% endif %}
+    <div class="form-container">
+      <div id="ts-error" style="display:none; color:#e74c3c; margin-bottom:12px; font-size:14px; text-align:center;">
+        Please complete the security check.
+      </div>
+      <form id="login-form" action="{{ path('clp_login') }}" method="post">
+        <div class="row">
+          <div class="col">
+            <input type="text" name="userName" required="required" autocomplete="username" class="form-control form-control-lg" placeholder="{% trans %}User Name{% endtrans %}">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <input type="password" name="password" required="required" autocomplete="current-password" class="form-control form-control-lg" placeholder="{% trans %}Password{% endtrans %}">
+          </div>
+        </div>
+        <div class="row" style="margin-bottom: 16px;">
+          <div class="col" style="display:flex; justify-content:center;">
+            <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}" data-theme="light" data-callback="onTurnstileSuccess"></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+            <button id="login-btn" type="submit" name="submit" class="btn btn-blue btn-login">{% trans %}Log In{% endtrans %}</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% block footer %}
+    {{ include('Frontend/Login/Partial/footer.html.twig') }}
+  {% endblock %}
+</div>
+
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<script>
+var _tsVerified = false;
+
+// Turnstile calls this callback when the user passes verification.
+// We send the token to ts-verify.php in the background — if OK, set _tsVerified = true.
+function onTurnstileSuccess(token) {
+  var data = new FormData();
+  data.append('token', token);
+  fetch('/ts-verify.php', { method: 'POST', body: data })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      _tsVerified = json.success === true;
+    })
+    .catch(function() {
+      _tsVerified = true; // fail-open: if verifier is unreachable, allow login
+    });
+}
+
+document.getElementById('login-form').addEventListener('submit', function(e) {
+  var token  = document.querySelector('[name="cf-turnstile-response"]');
+  var errBox = document.getElementById('ts-error');
+  errBox.style.display = 'none';
+
+  if (!token || !token.value) {
+    e.preventDefault();
+    errBox.textContent   = 'Please complete the security check.';
+    errBox.style.display = 'block';
+    return;
+  }
+
+  if (!_tsVerified) {
+    e.preventDefault();
+    errBox.textContent   = 'Security verification in progress, please try again in a moment.';
+    errBox.style.display = 'block';
+    return;
+  }
+
+  // _tsVerified === true — allow normal form submission
+});
+</script>
+{% endblock %}

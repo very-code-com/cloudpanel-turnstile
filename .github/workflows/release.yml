@@ -1,0 +1,32 @@
+name: Build Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build release archive
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ARCHIVE="cloudpanel-turnstile-${GITHUB_REF_NAME}.tar.gz"
+
+          mkdir -p build/cloudpanel-turnstile
+          cp -r src scripts README.md build/cloudpanel-turnstile/
+
+          chmod +x build/cloudpanel-turnstile/scripts/*.sh
+
+          tar -czf "$ARCHIVE" -C build cloudpanel-turnstile
+          echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$GITHUB_REF_NAME" "$ARCHIVE" --clobber
